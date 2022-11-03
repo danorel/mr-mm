@@ -8,11 +8,7 @@ class MRMatrixMultiplication(MRJob, ABC):
     def steps(self):
         return [
             MRStep(
-                mapper=self.mapper_matrix_row_col_split,
-                reducer=self.reducer_matrix_row_col_filter
-            ),
-            MRStep(
-                mapper=self.mapper_matrix_row_col_join,
+                mapper=self.mapper_matrix_representation,
                 reducer=self.reducer_matrix_row_col_dot_product
             ),
             MRStep(
@@ -26,58 +22,45 @@ class MRMatrixMultiplication(MRJob, ABC):
         ]
 
     @staticmethod
-    def mapper_matrix_row_col_split(_, line):
-        number, representation = line.split(":")
-        rows = representation.split("|")
-        for i, row in enumerate(rows):
-            yield f"matrix-{number}:row-{i}", row.split(",")
-        for j in range(len(rows)):
-            column = [row.split(",")[j] for row in rows]
-            yield f"matrix-{number}:col-{j}", column
-
-    @staticmethod
-    def reducer_matrix_row_col_filter(position, values):
-        if "matrix-1:row" in position or "matrix-2:col" in position:
-            yield position, next(values)
-
-    @staticmethod
-    def mapper_matrix_row_col_join(position, values):
-        if "matrix-2:col" in position:
-            index_is_column = position[13]
-            for index_for_row in range(len(values)):
-                yield f"row-{index_for_row}:column-{index_is_column}", values
+    def mapper_matrix_representation(_, next_line):
+        raw_number, raw_repr = next_line.split(":")
+        raw_rows = raw_repr.split("|")
+        if raw_number == "1":
+            for r, raw_row in enumerate(raw_rows):
+                row = raw_row.split(",")
+                for c in range(len(row)):
+                    yield f"{r}:{c}", row
         else:
-            index_is_row = position[13]
-            for index_for_col in range(len(values)):
-                yield f"row-{index_is_row}:column-{index_for_col}", values
+            for c in range(len(raw_rows)):
+                column = [raw_row.split(",")[c] for raw_row in raw_rows]
+                for r in range(len(column)):
+                    yield f"{r}:{c}", column
 
     @staticmethod
-    def reducer_matrix_row_col_dot_product(location, values):
-        row = next(values)
-        column = next(values)
+    def reducer_matrix_row_col_dot_product(rc, vectors):
+        r_vector = next(vectors)
+        c_vector = next(vectors)
         dot_product = []
-        for r_value, c_value in zip(row, column):
-            dot_product.append(int(r_value) * int(c_value))
-        yield location, sum(dot_product)
+        for r_scalar, c_scalar in zip(r_vector, c_vector):
+            dot_product.append(int(r_scalar) * int(c_scalar))
+        rc_scalar = sum(dot_product)
+        yield rc, rc_scalar
 
     @staticmethod
-    def mapper_row_convolution(position, value):
-        row_number = position[4]
-        row_column_value = str(value)
-        yield row_number, row_column_value
+    def mapper_row_convolution(rc, scalar):
+        yield rc[0], str(scalar)
 
     @staticmethod
-    def reducer_row_convolution(row_number, row_column_values):
-        row_column_values = ','.join(row_column_values)
-        yield row_number, row_column_values
+    def reducer_row_convolution(r, scalars):
+        yield r, ','.join(scalars)
 
     @staticmethod
-    def mapper_matrix_convolution(_, row_values):
-        yield "matrix", row_values
+    def mapper_matrix_convolution(_, r_scalars):
+        yield "matrix", r_scalars
 
     @staticmethod
-    def reducer_matrix_convolution(matrix, row_values):
-        yield matrix, '|'.join(row_values)
+    def reducer_matrix_convolution(matrix, r_scalars):
+        yield matrix, '|'.join(r_scalars)
 
 
 if __name__ == '__main__':
