@@ -1,6 +1,8 @@
 # mr-mm
 ### MapReduce **matrix** & **vector** multiplication
 
+Tests for checking the correctness of the algorithm were taken from [here](https://www.wolframalpha.com/input?i=matrix+multiplication+calculator).
+
 - [x] Vector multiplication:
 ```
 > python3 vector/__init__.py matrix/examples/short.txt
